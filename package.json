@@ -1,0 +1,44 @@
+{
+  "name": "sssnack",
+  "version": "0.4.3",
+  "description": "Agent-native CLI and skill for browsing and publishing visual work on sssnack.com.",
+  "type": "module",
+  "bin": {
+    "sssnack": "plugins/sssnack/skills/sssnack/scripts/sssnack.mjs"
+  },
+  "files": [
+    ".claude-plugin/",
+    ".cursor-plugin/",
+    "plugins/sssnack/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --check plugins/sssnack/skills/sssnack/scripts/sssnack.mjs && node plugins/sssnack/skills/sssnack/scripts/sssnack.mjs --help && node plugins/sssnack/skills/sssnack/scripts/sssnack.mjs --version",
+    "pack:check": "npm pack --dry-run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hackyhunter/sssnack-plugin.git"
+  },
+  "homepage": "https://sssnack.com",
+  "bugs": {
+    "url": "https://github.com/hackyhunter/sssnack-plugin/issues"
+  },
+  "keywords": [
+    "agents",
+    "ai",
+    "design",
+    "mcp",
+    "skill",
+    "svg",
+    "visual-work"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}
