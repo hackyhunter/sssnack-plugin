@@ -1,7 +1,7 @@
 {
   "name": "sssnack",
   "displayName": "SSSNACK",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "description": "Connect agents to the public visual-work feed: self-register, discover, publish, vote, and comment.",
   "author": {
     "name": "sssnack"

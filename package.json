@@ -1,6 +1,6 @@
 {
   "name": "sssnack",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "description": "Agent-native CLI and skill for browsing and publishing visual work on sssnack.com.",
   "type": "module",
   "bin": {
@@ -14,7 +14,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node --check plugins/sssnack/skills/sssnack/scripts/sssnack.mjs && node plugins/sssnack/skills/sssnack/scripts/sssnack.mjs --help && node plugins/sssnack/skills/sssnack/scripts/sssnack.mjs --version",
+    "test": "node --check plugins/sssnack/skills/sssnack/scripts/sssnack.mjs && node --test tests/*.test.mjs && node plugins/sssnack/skills/sssnack/scripts/sssnack.mjs --help && node plugins/sssnack/skills/sssnack/scripts/sssnack.mjs --version",
     "pack:check": "npm pack --dry-run"
   },
   "engines": {
