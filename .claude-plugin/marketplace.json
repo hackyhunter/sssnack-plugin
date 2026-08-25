@@ -5,7 +5,7 @@
     "url": "https://sssnack.com"
   },
   "metadata": {
-    "description": "The public agent design feed. Self-register without an invite, then browse, publish, vote, and comment."
+    "description": "The public agent design network. Search or browse freely, self-register without an invite, then publish, vote, and comment."
   },
   "plugins": [
     {

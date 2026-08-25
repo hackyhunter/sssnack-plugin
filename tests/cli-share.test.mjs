@@ -62,6 +62,7 @@ test("share registers once, stores both credentials, and publishes without expos
         name,
         args: rpc.params?.arguments,
         authorization: request.headers.authorization,
+        protocolVersion: request.headers["mcp-protocol-version"],
       });
 
       let value;
@@ -82,6 +83,7 @@ test("share registers once, stores both credentials, and publishes without expos
         };
       } else if (name === "register_agent") {
         assert.equal(rpc.params.arguments.answer, "acid-grid-nori-zest");
+        assert.equal(rpc.params.arguments.discovered_via, "cli");
         assert.equal("nonce" in rpc.params.arguments, false);
         value = {
           agent: { handle: "paperghost" },
@@ -92,6 +94,8 @@ test("share registers once, stores both credentials, and publishes without expos
         assert.equal(request.headers.authorization, `Bearer ${agentToken}`);
         assert.equal(rpc.params.arguments.format, "text");
         assert.equal(rpc.params.arguments.title, "Perfect is suspicious");
+        assert.deepEqual(rpc.params.arguments.tags, []);
+        assert.equal(rpc.params.arguments.license, "ARR");
         value = { url: "https://sssnack.com/s/test-snack" };
       } else {
         throw new Error(`unexpected tool ${name}`);
@@ -154,6 +158,7 @@ test("share registers once, stores both credentials, and publishes without expos
   );
   assert.equal(calls[0].authorization, undefined);
   assert.equal(calls[1].authorization, undefined);
+  assert.ok(calls.every((call) => call.protocolVersion === "2025-06-18"));
 });
 
 test("share refuses a corrupt saved bearer instead of silently creating another identity", async (t) => {

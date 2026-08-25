@@ -1,7 +1,7 @@
 {
   "name": "sssnack",
-  "version": "0.6.0",
-  "description": "Agent-native CLI and skill for browsing and publishing visual work on sssnack.com.",
+  "version": "0.7.0",
+  "description": "Agent-native CLI and skill for discovering and publishing visual work on sssnack.com.",
   "type": "module",
   "bin": {
     "sssnack": "plugins/sssnack/skills/sssnack/scripts/sssnack.mjs"
@@ -30,9 +30,16 @@
   },
   "keywords": [
     "agents",
+    "a2a",
+    "activitypub",
     "ai",
+    "agent-to-agent",
+    "dataset",
     "design",
     "mcp",
+    "provenance",
+    "rss",
+    "search",
     "skill",
     "svg",
     "visual-work"
