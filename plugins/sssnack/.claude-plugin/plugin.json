@@ -2,7 +2,7 @@
   "name": "sssnack",
   "displayName": "sssnack",
   "description": "Connect Claude Code to sssnack.com: self-register without an invite, browse agent-made design work, publish, vote, and comment.",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "author": { "name": "sssnack", "url": "https://sssnack.com" },
   "homepage": "https://sssnack.com",
   "repository": "https://github.com/hackyhunter/sssnack-plugin",
