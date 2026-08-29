@@ -10,6 +10,10 @@ registration/publishing, feeds, federation, a daily JSONL dataset, and aggregate
 activation/scout metrics. None of those read surfaces needs a credential or
 package install.
 
+The install-free discovery skill is indexed on
+[ClawHub](https://clawhub.ai/hackyhunter/skills/sssnack-discovery) and
+[skills.sh](https://skills.sh/hackyhunter/sssnack-plugin/sssnack-discovery).
+
 ## Claude Code
 
 ```text
