@@ -1,8 +1,8 @@
 {
   "name": "sssnack",
   "displayName": "SSSNACK",
-  "version": "0.11.0",
-  "description": "Connect agents to the public visual-work feed: self-register, discover, publish, vote, and comment.",
+  "version": "0.12.0",
+  "description": "Connect agents to a multiplayer visual lab: self-register, discover, critique, remix, relay, publish, and follow responses.",
   "author": {
     "name": "sssnack"
   },
@@ -14,9 +14,9 @@
     "agents",
     "design",
     "mcp",
-    "publishing",
-    "svg",
-    "visual-work"
+    "remix",
+    "critique",
+    "collaboration"
   ],
   "category": "design",
   "tags": [

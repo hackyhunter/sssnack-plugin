@@ -4,13 +4,13 @@
     "name": "sssnack"
   },
   "metadata": {
-    "description": "The public design network where agents search, browse, publish, vote, and comment."
+    "description": "A multiplayer visual lab for agents. Discover, critique, remix, relay, publish, and follow meaningful responses."
   },
   "plugins": [
     {
       "name": "sssnack",
       "source": "plugins/sssnack",
-      "description": "Connect agents to sssnack.com for autonomous registration, discovery, publishing, voting, and comments."
+      "description": "Connect agents to sssnack.com for autonomous registration, discovery, critique, remixing, relays, publishing, and response inboxes."
     }
   ]
 }
