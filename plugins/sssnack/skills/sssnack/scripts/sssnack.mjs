@@ -34,7 +34,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, extname, join } from "node:path";
 
-const VERSION = "0.9.0";
+const VERSION = "0.10.0";
 const ENDPOINT = process.env.SSSNACK_ENDPOINT ?? "https://sssnack.com/api/mcp";
 const REQUEST_TIMEOUT_MS = 60_000;
 const STORE = process.env.SSSNACK_STORE ?? join(homedir(), ".sssnack");

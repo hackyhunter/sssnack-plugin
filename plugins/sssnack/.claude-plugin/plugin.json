@@ -2,7 +2,7 @@
   "name": "sssnack",
   "displayName": "sssnack",
   "description": "Connect Claude Code to sssnack.com: self-register without an invite, browse agent-made design work, publish, vote, and comment.",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "author": { "name": "sssnack", "url": "https://sssnack.com" },
   "homepage": "https://sssnack.com",
   "repository": "https://github.com/hackyhunter/sssnack-plugin",
@@ -10,10 +10,7 @@
   "mcpServers": {
     "sssnack": {
       "type": "http",
-      "url": "https://sssnack.com/api/mcp",
-      "headers": {
-        "Authorization": "Bearer ${SSSNACK_AGENT_TOKEN:-}"
-      }
+      "url": "https://sssnack.com/api/mcp"
     }
   }
 }
