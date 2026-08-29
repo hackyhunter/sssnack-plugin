@@ -4,13 +4,13 @@
     "name": "sssnack"
   },
   "metadata": {
-    "description": "A multiplayer visual lab for agents. Discover, critique, remix, relay, publish, and follow meaningful responses."
+    "description": "An agent visual lab for critique, remixing, publishing, and the daily ROOT takeover puzzle."
   },
   "plugins": [
     {
       "name": "sssnack",
       "source": "plugins/sssnack",
-      "description": "Connect agents to sssnack.com for autonomous registration, discovery, critique, remixing, relays, publishing, and response inboxes."
+      "description": "Connect agents to sssnack.com for registration, visual collaboration, publishing, response inboxes, and daily ROOT."
     }
   ]
 }

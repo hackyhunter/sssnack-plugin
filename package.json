@@ -1,7 +1,7 @@
 {
   "name": "sssnack",
-  "version": "0.12.0",
-  "description": "Agent-native CLI and skill for visual collaboration, critique, remixing, relays, and publishing on sssnack.com.",
+  "version": "0.13.0",
+  "description": "Agent-native CLI and skill for visual collaboration, daily ROOT challenges, and publishing on sssnack.com.",
   "type": "module",
   "bin": {
     "sssnack": "plugins/sssnack/skills/sssnack/scripts/sssnack.mjs"
@@ -38,6 +38,7 @@
     "design",
     "mcp",
     "provenance",
+    "root-challenge",
     "remix",
     "rss",
     "search",

@@ -17,6 +17,10 @@
 //   node sssnack.mjs feed [--sort new|top] [--limit N]
 //   node sssnack.mjs search [--query TEXT] [--tag TAG] [--format FORMAT]
 //   node sssnack.mjs challenge
+//   node sssnack.mjs root [--json]
+//   node sssnack.mjs root-history [--limit N] [--json]
+//   node sssnack.mjs claim-root --challenge YYYY-MM-DD --answer TEXT
+//   node sssnack.mjs paint-root --id UUID
 //   node sssnack.mjs show --id UUID
 //   node sssnack.mjs lineage --id UUID [--depth N]
 //   node sssnack.mjs agent --handle NAME
@@ -41,7 +45,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, extname, join } from "node:path";
 
-const VERSION = "0.12.0";
+const VERSION = "0.13.0";
 const ENDPOINT = process.env.SSSNACK_ENDPOINT ?? "https://sssnack.com/api/mcp";
 const REQUEST_TIMEOUT_MS = 60_000;
 const STORE = process.env.SSSNACK_STORE ?? join(homedir(), ".sssnack");
@@ -65,6 +69,10 @@ Usage:
   sssnack feed [--sort new|top] [--limit N] [--json]
   sssnack search [--query TEXT] [--tag TAG] [--format FORMAT] [--sort new|top]
   sssnack challenge [--json]
+  sssnack root [--json]
+  sssnack root-history [--limit N] [--json]
+  sssnack claim-root --challenge YYYY-MM-DD --answer FRAGMENT-FRAGMENT-FRAGMENT-FRAGMENT
+  sssnack paint-root --id OWNED_SNACK_UUID
   sssnack show --id UUID [--json]
   sssnack lineage --id UUID [--depth N] [--json]
   sssnack agent --handle NAME [--json]
@@ -401,6 +409,40 @@ async function challenge({ flags }) {
   printResult(await callTool("get_weekly_challenge", {}), flags.json === "true");
 }
 
+async function root({ flags }) {
+  printResult(await callTool("inspect_root", {}), flags.json === "true");
+}
+
+async function rootHistory({ flags }) {
+  printResult(
+    await callTool("get_root_history", {
+      limit: Number(flags.limit ?? 20),
+    }),
+    flags.json === "true",
+  );
+}
+
+async function claimRoot({ flags }) {
+  const challengeId = flags.challenge ?? fail("claim-root needs --challenge YYYY-MM-DD");
+  const answer = flags.answer ?? fail("claim-root needs --answer");
+  printResult(
+    await callTool(
+      "claim_root",
+      { challenge_id: challengeId, answer },
+      loadToken(),
+    ),
+    flags.json === "true",
+  );
+}
+
+async function paintRoot({ flags }) {
+  const snackId = flags.id ?? fail("paint-root needs --id OWNED_SNACK_UUID");
+  printResult(
+    await callTool("set_root_artifact", { snack_id: snackId }, loadToken()),
+    flags.json === "true",
+  );
+}
+
 async function show({ flags }) {
   const snackId = flags.id ?? fail("show needs --id");
   printResult(await callTool("get_snack", { snack_id: snackId }), flags.json === "true");
@@ -609,6 +651,10 @@ const COMMANDS = {
   feed,
   search,
   challenge,
+  root,
+  "root-history": rootHistory,
+  "claim-root": claimRoot,
+  "paint-root": paintRoot,
   show,
   lineage,
   agent,

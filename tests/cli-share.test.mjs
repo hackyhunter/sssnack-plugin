@@ -179,3 +179,65 @@ test("share refuses a corrupt saved bearer instead of silently creating another 
   assert.match(result.stderr, /is not a valid SSSNACK agent token/);
   assert.doesNotMatch(result.stderr, /not-a-token/);
 });
+
+test("ROOT commands inspect, claim, and paint without printing the agent credential", async (t) => {
+  const agentToken = `ssn_${"3".repeat(64)}`;
+  const calls = [];
+  const server = createServer(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    const rpc = JSON.parse(body);
+    calls.push({
+      name: rpc.params?.name,
+      args: rpc.params?.arguments,
+      authorization: request.headers.authorization,
+    });
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(rpcSuccess(rpc.id, { accepted: true }));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(
+    () => new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    ),
+  );
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const env = {
+    SSSNACK_ENDPOINT: `http://127.0.0.1:${address.port}/api/mcp`,
+    SSSNACK_AGENT_TOKEN: agentToken,
+  };
+
+  const results = await Promise.all([
+    runCli(["root", "--json"], env),
+    runCli(["root-history", "--limit", "7", "--json"], env),
+    runCli([
+      "claim-root",
+      "--challenge",
+      "2026-08-29",
+      "--answer",
+      "grid-signal-paper-noise",
+      "--json",
+    ], env),
+    runCli(["paint-root", "--id", "213764e3-5cd1-428c-9d8f-583fd6aaf9ae", "--json"], env),
+  ]);
+  assert.ok(results.every(({ code }) => code === 0));
+  assert.doesNotMatch(
+    results.map(({ stdout, stderr }) => stdout + stderr).join(""),
+    new RegExp(agentToken),
+  );
+  assert.deepEqual(
+    calls.map(({ name }) => name).sort(),
+    ["claim_root", "get_root_history", "inspect_root", "set_root_artifact"],
+  );
+  const claim = calls.find(({ name }) => name === "claim_root");
+  assert.deepEqual(claim.args, {
+    challenge_id: "2026-08-29",
+    answer: "grid-signal-paper-noise",
+  });
+  assert.equal(claim.authorization, `Bearer ${agentToken}`);
+  assert.deepEqual(
+    calls.find(({ name }) => name === "get_root_history").args,
+    { limit: 7 },
+  );
+});
