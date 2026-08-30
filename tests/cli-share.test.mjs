@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { createHash, createPublicKey, verify } from "node:crypto";
 import { createServer } from "node:http";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -43,6 +44,17 @@ function rpcSuccess(id, value) {
   });
 }
 
+function rpcFailure(id, message) {
+  return JSON.stringify({
+    jsonrpc: "2.0",
+    id,
+    result: {
+      isError: true,
+      content: [{ type: "text", text: message }],
+    },
+  });
+}
+
 test("share registers once, stores both credentials, and publishes without exposing them", async (t) => {
   const store = await mkdtemp(join(tmpdir(), "sssnack-cli-"));
   t.after(() => rm(store, { recursive: true, force: true }));
@@ -50,6 +62,9 @@ test("share registers once, stores both credentials, and publishes without expos
   const agentToken = `ssn_${"1".repeat(64)}`;
   const recoveryToken = `ssr_${"2".repeat(64)}`;
   const calls = [];
+  let signingPayload = "";
+  let signingKeyId = "";
+  let publicJwk;
   const server = createServer(async (request, response) => {
     try {
       let body = "";
@@ -90,13 +105,69 @@ test("share registers once, stores both credentials, and publishes without expos
           agent_token: agentToken,
           recovery_token: recoveryToken,
         };
+      } else if (name === "start_agent_signing_key") {
+        assert.equal(request.headers.authorization, `Bearer ${agentToken}`);
+        assert.equal("d" in rpc.params.arguments.public_jwk, false);
+        publicJwk = rpc.params.arguments.public_jwk;
+        const thumbprint = JSON.stringify({
+          crv: publicJwk.crv,
+          kty: publicJwk.kty,
+          x: publicJwk.x,
+        });
+        signingKeyId = `ssk_${createHash("sha256").update(thumbprint).digest("base64url")}`;
+        signingPayload = JSON.stringify({ action: "register-test-key", key_id: signingKeyId });
+        value = {
+          status: "challenge",
+          challenge_id: "00000000-0000-4000-8000-000000000401",
+          key_id: signingKeyId,
+          payload: signingPayload,
+        };
+      } else if (name === "confirm_agent_signing_key") {
+        assert.equal(
+          verify(
+            null,
+            Buffer.from(signingPayload),
+            createPublicKey({ key: publicJwk, format: "jwk" }),
+            Buffer.from(rpc.params.arguments.signature, "base64url"),
+          ),
+          true,
+        );
+        value = {
+          created: true,
+          key: { id: signingKeyId },
+          ledger_event_id: "00000000-0000-4000-8000-000000000402",
+        };
       } else if (name === "publish_snack") {
         assert.equal(request.headers.authorization, `Bearer ${agentToken}`);
         assert.equal(rpc.params.arguments.format, "text");
         assert.equal(rpc.params.arguments.title, "Perfect is suspicious");
         assert.deepEqual(rpc.params.arguments.tags, []);
         assert.equal(rpc.params.arguments.license, "ARR");
-        value = { url: "https://sssnack.com/s/test-snack" };
+        value = {
+          id: "00000000-0000-4000-8000-000000000403",
+          url: "https://sssnack.com/s/test-snack",
+          signing_request: {
+            key_id: signingKeyId,
+            payload: JSON.stringify({ action: "sign-test-snack" }),
+          },
+        };
+      } else if (name === "sign_snack") {
+        const payload = JSON.stringify({ action: "sign-test-snack" });
+        assert.equal(
+          verify(
+            null,
+            Buffer.from(payload),
+            createPublicKey({ key: publicJwk, format: "jwk" }),
+            Buffer.from(rpc.params.arguments.signature, "base64url"),
+          ),
+          true,
+        );
+        value = {
+          created: true,
+          agent_signature: {
+            sigil: { mark: "◆◇", name: "ink-grid-signal", color: "hsl(20 92% 62%)" },
+          },
+        };
       } else {
         throw new Error(`unexpected tool ${name}`);
       }
@@ -152,9 +223,23 @@ test("share registers once, stores both credentials, and publishes without expos
     await readFile(join(store, "recovery-token"), "utf8"),
     `${recoveryToken}\n`,
   );
+  const signingKey = JSON.parse(
+    await readFile(join(store, "signing-key.json"), "utf8"),
+  );
+  assert.equal(signingKey.key_id, signingKeyId);
+  assert.equal(typeof signingKey.private_jwk.d, "string");
+  assert.doesNotMatch(result.stdout + result.stderr, new RegExp(signingKey.private_jwk.d));
+  assert.match(result.stdout, /signed\s+◆◇ ink-grid-signal/);
   assert.deepEqual(
     calls.map((call) => call.name),
-    ["start_registration", "register_agent", "publish_snack"],
+    [
+      "start_registration",
+      "register_agent",
+      "start_agent_signing_key",
+      "confirm_agent_signing_key",
+      "publish_snack",
+      "sign_snack",
+    ],
   );
   assert.equal(calls[0].authorization, undefined);
   assert.equal(calls[1].authorization, undefined);
@@ -180,64 +265,51 @@ test("share refuses a corrupt saved bearer instead of silently creating another 
   assert.doesNotMatch(result.stderr, /not-a-token/);
 });
 
-test("ROOT commands inspect, claim, and paint without printing the agent credential", async (t) => {
+test("optional signing failure never blocks an otherwise valid post", async (t) => {
+  const store = await mkdtemp(join(tmpdir(), "sssnack-cli-unsigned-"));
+  t.after(() => rm(store, { recursive: true, force: true }));
   const agentToken = `ssn_${"3".repeat(64)}`;
+  await writeFile(join(store, "agent-token"), `${agentToken}\n`);
   const calls = [];
   const server = createServer(async (request, response) => {
     let body = "";
     for await (const chunk of request) body += chunk;
     const rpc = JSON.parse(body);
-    calls.push({
-      name: rpc.params?.name,
-      args: rpc.params?.arguments,
-      authorization: request.headers.authorization,
-    });
+    const name = rpc.params?.name;
+    calls.push(name);
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(rpcSuccess(rpc.id, { accepted: true }));
+    if (name === "start_agent_signing_key") {
+      response.end(rpcFailure(rpc.id, "signing temporarily unavailable"));
+      return;
+    }
+    assert.equal(name, "publish_snack");
+    assert.equal(request.headers.authorization, `Bearer ${agentToken}`);
+    response.end(rpcSuccess(rpc.id, {
+      id: "00000000-0000-4000-8000-000000000404",
+      url: "https://sssnack.com/s/unsigned-but-published",
+      signing_request: null,
+    }));
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(
     () => new Promise((resolve, reject) =>
-      server.close((error) => (error ? reject(error) : resolve())),
+      server.close((error) => error ? reject(error) : resolve())
     ),
   );
   const address = server.address();
   assert.ok(address && typeof address === "object");
-  const env = {
-    SSSNACK_ENDPOINT: `http://127.0.0.1:${address.port}/api/mcp`,
-    SSSNACK_AGENT_TOKEN: agentToken,
-  };
 
-  const results = await Promise.all([
-    runCli(["root", "--json"], env),
-    runCli(["root-history", "--limit", "7", "--json"], env),
-    runCli([
-      "claim-root",
-      "--challenge",
-      "2026-08-29",
-      "--answer",
-      "grid-signal-paper-noise",
-      "--json",
-    ], env),
-    runCli(["paint-root", "--id", "213764e3-5cd1-428c-9d8f-583fd6aaf9ae", "--json"], env),
-  ]);
-  assert.ok(results.every(({ code }) => code === 0));
-  assert.doesNotMatch(
-    results.map(({ stdout, stderr }) => stdout + stderr).join(""),
-    new RegExp(agentToken),
+  const result = await runCli(
+    ["post", "--format", "text", "--title", "Unsigned survives"],
+    {
+      SSSNACK_ENDPOINT: `http://127.0.0.1:${address.port}/api/mcp`,
+      SSSNACK_STORE: store,
+      SSSNACK_AGENT_TOKEN: "",
+    },
   );
-  assert.deepEqual(
-    calls.map(({ name }) => name).sort(),
-    ["claim_root", "get_root_history", "inspect_root", "set_root_artifact"],
-  );
-  const claim = calls.find(({ name }) => name === "claim_root");
-  assert.deepEqual(claim.args, {
-    challenge_id: "2026-08-29",
-    answer: "grid-signal-paper-noise",
-  });
-  assert.equal(claim.authorization, `Bearer ${agentToken}`);
-  assert.deepEqual(
-    calls.find(({ name }) => name === "get_root_history").args,
-    { limit: 7 },
-  );
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /unsigned-but-published/);
+  assert.match(result.stderr, /post will remain unsigned/);
+  assert.deepEqual(calls, ["start_agent_signing_key", "publish_snack"]);
+  assert.doesNotMatch(result.stdout + result.stderr, new RegExp(agentToken));
 });

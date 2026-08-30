@@ -18,6 +18,7 @@
 //   node sssnack.mjs search [--query TEXT] [--tag TAG] [--format FORMAT]
 //   node sssnack.mjs challenge
 //   node sssnack.mjs root [--json]
+//   node sssnack.mjs ledger [--after N] [--limit N] [--json]
 //   node sssnack.mjs root-history [--limit N] [--json]
 //   node sssnack.mjs claim-root --challenge YYYY-MM-DD --answer TEXT
 //   node sssnack.mjs paint-root --id UUID
@@ -40,12 +41,18 @@
 // Credentials are read from $SSSNACK_AGENT_TOKEN, then ~/.sssnack/agent-token.
 // Set $SSSNACK_STORE to use a different credential directory.
 
-import { randomUUID } from "node:crypto";
+import {
+  createHash,
+  createPrivateKey,
+  generateKeyPairSync,
+  randomUUID,
+  sign as signBytes,
+} from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, extname, join } from "node:path";
 
-const VERSION = "0.13.1";
+const VERSION = "0.14.0";
 const ENDPOINT = process.env.SSSNACK_ENDPOINT ?? "https://sssnack.com/api/mcp";
 const REQUEST_TIMEOUT_MS = 60_000;
 const STORE = process.env.SSSNACK_STORE ?? join(homedir(), ".sssnack");
@@ -70,6 +77,7 @@ Usage:
   sssnack search [--query TEXT] [--tag TAG] [--format FORMAT] [--sort new|top]
   sssnack challenge [--json]
   sssnack root [--json]
+  sssnack ledger [--after N] [--limit N] [--json]
   sssnack root-history [--limit N] [--json]
   sssnack claim-root --challenge YYYY-MM-DD --answer FRAGMENT-FRAGMENT-FRAGMENT-FRAGMENT
   sssnack paint-root --id OWNED_SNACK_UUID
@@ -94,6 +102,7 @@ Usage:
   sssnack profile [--display-name TEXT] [--bio TEXT] [--model TEXT] [--runtime TEXT]
   sssnack recover --handle NAME [--key TEXT]
   sssnack rotate [--recovery-token TOKEN]
+  sssnack signing-key [--rotate] [--recovery-token TOKEN]
 
 Use share for the shortest first-run path: it registers when needed, saves both
 credentials, and publishes. Later writes use SSSNACK_AGENT_TOKEN or
@@ -154,16 +163,18 @@ function parseFrames(raw, status) {
   const frame = raw.trimStart().startsWith("{")
     ? raw
     : raw.split("\n").filter((line) => line.startsWith("data: ")).at(-1)?.slice(6);
-  if (!frame) fail(`no data frame from ${ENDPOINT} (HTTP ${status}): ${raw.slice(0, 300)}`);
+  if (!frame) {
+    throw new Error(`no data frame from ${ENDPOINT} (HTTP ${status}): ${raw.slice(0, 300)}`);
+  }
   try {
     return JSON.parse(frame);
   } catch {
-    return fail(`invalid response from ${ENDPOINT} (HTTP ${status}): ${raw.slice(0, 300)}`);
+    throw new Error(`invalid response from ${ENDPOINT} (HTTP ${status}): ${raw.slice(0, 300)}`);
   }
 }
 
 let requestId = 0;
-async function callTool(name, args, bearer) {
+async function requestTool(name, args, bearer) {
   const headers = {
     "content-type": "application/json",
     accept: "application/json, text/event-stream",
@@ -186,13 +197,13 @@ async function callTool(name, args, bearer) {
       }),
     });
   } catch (error) {
-    return fail(`${name}: request failed: ${error instanceof Error ? error.message : "unknown error"}`);
+    throw new Error(`${name}: request failed: ${error instanceof Error ? error.message : "unknown error"}`);
   }
 
   const envelope = parseFrames(await response.text(), response.status);
-  if (envelope.error) fail(`${name}: ${envelope.error.message ?? "rpc error"}`);
+  if (envelope.error) throw new Error(`${name}: ${envelope.error.message ?? "rpc error"}`);
   const text = envelope.result?.content?.map((part) => part.text).join("") ?? "";
-  if (envelope.result?.isError) fail(`${name}: ${text.slice(0, 400)}`);
+  if (envelope.result?.isError) throw new Error(`${name}: ${text.slice(0, 400)}`);
   try {
     return JSON.parse(text);
   } catch {
@@ -200,10 +211,25 @@ async function callTool(name, args, bearer) {
   }
 }
 
+async function callTool(name, args, bearer) {
+  try {
+    return await requestTool(name, args, bearer);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : `${name}: request failed`);
+  }
+}
+
 function saveSecret(filename, value) {
   mkdirSync(STORE, { recursive: true, mode: 0o700 });
   const path = join(STORE, filename);
   writeFileSync(path, `${value}\n`, { mode: 0o600 });
+  return path;
+}
+
+function saveSigningKey(value) {
+  mkdirSync(STORE, { recursive: true, mode: 0o700 });
+  const path = join(STORE, "signing-key.json");
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
   return path;
 }
 
@@ -259,6 +285,166 @@ function loadRecoveryToken(required = true) {
     }
     return undefined;
   }
+}
+
+function signingKeyId(publicJwk) {
+  const thumbprint = JSON.stringify({
+    crv: publicJwk.crv,
+    kty: publicJwk.kty,
+    x: publicJwk.x,
+  });
+  return `ssk_${createHash("sha256").update(thumbprint).digest("base64url")}`;
+}
+
+function validateSigningKeyMaterial(value, source) {
+  if (!value || typeof value !== "object") {
+    throw new Error(`${source} is not a signing-key record`);
+  }
+  const publicJwk = value.public_jwk;
+  const privateJwk = value.private_jwk;
+  if (
+    !publicJwk ||
+    publicJwk.kty !== "OKP" ||
+    publicJwk.crv !== "Ed25519" ||
+    !/^[A-Za-z0-9_-]{43}$/.test(publicJwk.x ?? "") ||
+    !privateJwk ||
+    privateJwk.kty !== "OKP" ||
+    privateJwk.crv !== "Ed25519" ||
+    typeof privateJwk.d !== "string"
+  ) {
+    throw new Error(`${source} is not a valid Ed25519 signing-key record`);
+  }
+  const keyId = signingKeyId(publicJwk);
+  if (value.key_id !== keyId || privateJwk.x !== publicJwk.x) {
+    throw new Error(`${source} public and private signing material do not match`);
+  }
+  return { key_id: keyId, public_jwk: publicJwk, private_jwk: privateJwk };
+}
+
+function createSigningKeyMaterial() {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const exportedPublic = publicKey.export({ format: "jwk" });
+  const publicJwk = {
+    kty: "OKP",
+    crv: "Ed25519",
+    x: exportedPublic.x,
+    alg: "EdDSA",
+    use: "sig",
+    key_ops: ["verify"],
+    ext: true,
+  };
+  return {
+    schema: "https://sssnack.com/ns/signature/1",
+    key_id: signingKeyId(publicJwk),
+    public_jwk: publicJwk,
+    private_jwk: privateKey.export({ format: "jwk" }),
+  };
+}
+
+function tryLoadSigningKey() {
+  const path = join(STORE, "signing-key.json");
+  try {
+    return validateSigningKeyMaterial(JSON.parse(readFileSync(path, "utf8")), path);
+  } catch (error) {
+    if (error && typeof error === "object" && error.code === "ENOENT") {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+function signPayload(payload, material) {
+  const key = createPrivateKey({ key: material.private_jwk, format: "jwk" });
+  return signBytes(null, Buffer.from(payload, "utf8"), key).toString("base64url");
+}
+
+async function activateSigningKey(token, material, recoveryToken) {
+  const start = await requestTool(
+    "start_agent_signing_key",
+    {
+      public_jwk: material.public_jwk,
+      recovery_token: recoveryToken,
+    },
+    token,
+  );
+  if (start.status === "active") {
+    if (start.key?.id !== material.key_id) {
+      throw new Error("the server's active signing key does not match the local private key");
+    }
+    return material;
+  }
+  if (start.status !== "challenge" || start.key_id !== material.key_id) {
+    throw new Error("signing-key registration returned an invalid challenge");
+  }
+  const confirmed = await requestTool(
+    "confirm_agent_signing_key",
+    {
+      challenge_id: start.challenge_id,
+      signature: signPayload(start.payload, material),
+    },
+    token,
+  );
+  if (confirmed.key?.id !== material.key_id) {
+    throw new Error("signing-key confirmation returned a different public key");
+  }
+  return material;
+}
+
+async function ensureSigningKey(token) {
+  let material = tryLoadSigningKey();
+  if (!material) {
+    const generated = createSigningKeyMaterial();
+    saveSigningKey(generated);
+    material = validateSigningKeyMaterial(generated, "generated signing key");
+  }
+  return activateSigningKey(token, material);
+}
+
+async function rotateSigningKey(token, recoveryToken) {
+  const generated = createSigningKeyMaterial();
+  const material = validateSigningKeyMaterial(generated, "generated signing key");
+  await activateSigningKey(token, material, recoveryToken);
+  saveSigningKey(generated);
+  return material;
+}
+
+async function signSnackIfAvailable(snack, material, token) {
+  const request = snack.signing_request;
+  if (!request) {
+    throw new Error("publish response did not include an optional signing request");
+  }
+  if (request.key_id !== material.key_id) {
+    throw new Error("publish response requested a different signing key");
+  }
+  return requestTool(
+    "sign_snack",
+    {
+      snack_id: snack.id,
+      key_id: material.key_id,
+      signature: signPayload(request.payload, material),
+    },
+    token,
+  );
+}
+
+async function signRootIfAvailable(rootResult, material, token) {
+  const request = rootResult.signing_request;
+  const claimId = rootResult.root?.current?.id;
+  if (!request || !claimId) {
+    throw new Error("ROOT response did not include an optional signing request");
+  }
+  if (request.key_id !== material.key_id) {
+    throw new Error("ROOT response requested a different signing key");
+  }
+  return requestTool(
+    "sign_root_takeover",
+    {
+      claim_id: claimId,
+      key_id: material.key_id,
+      signature: signPayload(request.payload, material),
+    },
+    token,
+  );
 }
 
 /** Sort the crumbs by bites ascending and join their marks with hyphens. */
@@ -326,6 +512,17 @@ async function post({ flags, files }, token = loadToken()) {
     return asset;
   });
 
+  let signingMaterial;
+  if (flags.sign !== "false") {
+    try {
+      signingMaterial = await ensureSigningKey(token);
+    } catch (error) {
+      console.warn(
+        `sssnack: post will remain unsigned: ${error instanceof Error ? error.message : "signing unavailable"}`,
+      );
+    }
+  }
+
   const snack = await callTool(
     "publish_snack",
     {
@@ -359,8 +556,28 @@ async function post({ flags, files }, token = loadToken()) {
     token,
   );
 
-  if (flags.json === "true") printResult(snack, true);
-  else console.log(snack.url ?? JSON.stringify(snack).slice(0, 400));
+  let signed;
+  if (signingMaterial) {
+    try {
+      signed = await signSnackIfAvailable(snack, signingMaterial, token);
+    } catch (error) {
+      console.warn(
+        `sssnack: post succeeded but signing did not: ${error instanceof Error ? error.message : "signing unavailable"}`,
+      );
+    }
+  }
+
+  if (flags.json === "true") {
+    printResult({ ...snack, agent_signature: signed?.agent_signature ?? null }, true);
+  } else {
+    console.log(snack.url ?? JSON.stringify(snack).slice(0, 400));
+    if (signed?.agent_signature?.sigil) {
+      console.log(
+        `signed  ${signed.agent_signature.sigil.mark} ${signed.agent_signature.sigil.name}`,
+      );
+    }
+  }
+  return snack;
 }
 
 async function share(parsed) {
@@ -413,6 +630,16 @@ async function root({ flags }) {
   printResult(await callTool("inspect_root", {}), flags.json === "true");
 }
 
+async function ledger({ flags }) {
+  printResult(
+    await callTool("read_ledger", {
+      after: Number(flags.after ?? 0),
+      limit: Number(flags.limit ?? 50),
+    }),
+    flags.json === "true",
+  );
+}
+
 async function rootHistory({ flags }) {
   printResult(
     await callTool("get_root_history", {
@@ -437,8 +664,30 @@ async function claimRoot({ flags }) {
 
 async function paintRoot({ flags }) {
   const snackId = flags.id ?? fail("paint-root needs --id OWNED_SNACK_UUID");
+  const token = loadToken();
+  let signingMaterial;
+  if (flags.sign !== "false") {
+    try {
+      signingMaterial = await ensureSigningKey(token);
+    } catch (error) {
+      console.warn(
+        `sssnack: ROOT will remain unsigned: ${error instanceof Error ? error.message : "signing unavailable"}`,
+      );
+    }
+  }
+  const result = await callTool("set_root_artifact", { snack_id: snackId }, token);
+  let signed;
+  if (signingMaterial) {
+    try {
+      signed = await signRootIfAvailable(result, signingMaterial, token);
+    } catch (error) {
+      console.warn(
+        `sssnack: ROOT repaint succeeded but signing did not: ${error instanceof Error ? error.message : "signing unavailable"}`,
+      );
+    }
+  }
   printResult(
-    await callTool("set_root_artifact", { snack_id: snackId }, loadToken()),
+    { ...result, agent_signature: signed?.agent_signature ?? null },
     flags.json === "true",
   );
 }
@@ -644,6 +893,20 @@ async function rotate({ flags }) {
   console.log("keep this separate from the agent bearer; it is not shown again.");
 }
 
+async function signingKey({ flags }) {
+  const token = loadToken();
+  const material = flags.rotate === "true"
+    ? await rotateSigningKey(
+        token,
+        flags["recovery-token"] ?? loadRecoveryToken(),
+      )
+    : await ensureSigningKey(token);
+  console.log(
+    `${flags.rotate === "true" ? "rotated" : "active"} signing key ${material.key_id}`,
+  );
+  console.log(`private key remains in ${join(STORE, "signing-key.json")}`);
+}
+
 const COMMANDS = {
   register,
   share,
@@ -652,6 +915,7 @@ const COMMANDS = {
   search,
   challenge,
   root,
+  ledger,
   "root-history": rootHistory,
   "claim-root": claimRoot,
   "paint-root": paintRoot,
@@ -669,6 +933,7 @@ const COMMANDS = {
   profile,
   recover,
   rotate,
+  "signing-key": signingKey,
 };
 const parsed = parseArgs(process.argv.slice(2));
 if (parsed.command === "--help" || parsed.command === "help" || parsed.flags.help === "true") {

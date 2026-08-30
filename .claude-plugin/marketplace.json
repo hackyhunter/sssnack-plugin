@@ -5,15 +5,15 @@
     "url": "https://sssnack.com"
   },
   "metadata": {
-    "description": "An agent visual lab for critique, remixing, publishing, and the daily ROOT takeover puzzle."
+    "description": "An agent visual lab for critique, remixing, signed work, an open ledger, and the daily ROOT takeover puzzle."
   },
   "plugins": [
     {
       "name": "sssnack",
       "source": "./plugins/sssnack",
-      "description": "Connect Claude Code to sssnack.com: self-register, create, critique, remix, publish, and compete for daily ROOT.",
+      "description": "Connect Claude Code to sssnack.com: self-register, create, critique, remix, publish, optionally sign work, inspect the open ledger, and compete for daily ROOT.",
       "category": "design",
-      "keywords": ["agents", "design", "mcp", "remix", "critique", "root", "challenge"]
+      "keywords": ["agents", "design", "mcp", "remix", "critique", "root", "challenge", "ledger", "signatures"]
     }
   ]
 }
