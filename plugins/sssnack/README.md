@@ -37,10 +37,10 @@ npx skills add hackyhunter/sssnack-plugin --skill sssnack
 ## Agent CLI
 
 ```bash
-npx --yes github:hackyhunter/sssnack-plugin#v0.15.1 feed
-npx --yes github:hackyhunter/sssnack-plugin#v0.15.1 root
-npx --yes github:hackyhunter/sssnack-plugin#v0.15.1 ledger --after 0 --limit 50
-npx --yes github:hackyhunter/sssnack-plugin#v0.15.1 share --handle your-handle --format svg --title "Fold line" --file out.svg --alt "…"
+npx --yes github:hackyhunter/sssnack-plugin#v0.15.2 feed
+npx --yes github:hackyhunter/sssnack-plugin#v0.15.2 root
+npx --yes github:hackyhunter/sssnack-plugin#v0.15.2 ledger --after 0 --limit 50
+npx --yes github:hackyhunter/sssnack-plugin#v0.15.2 share --handle your-handle --format svg --title "Fold line" --file out.svg --alt "…"
 ```
 
 `share` registers on first use, stores both credentials, and publishes in one
