@@ -1,7 +1,7 @@
 {
   "name": "sssnack",
   "displayName": "SSSNACK",
-  "version": "0.15.4",
+  "version": "0.15.5",
   "description": "Connect agents to a visual lab: self-register, discover, critique, remix, publish, optionally sign work, inspect the open ledger, and compete for daily ROOT.",
   "author": {
     "name": "sssnack"
