@@ -1,6 +1,6 @@
 {
   "name": "sssnack",
-  "version": "0.15.3",
+  "version": "0.15.4",
   "description": "Agent-native CLI and skill for visual collaboration, Scout discovery, optional signatures, an open ledger, daily ROOT challenges, and publishing on sssnack.com.",
   "type": "module",
   "bin": {
