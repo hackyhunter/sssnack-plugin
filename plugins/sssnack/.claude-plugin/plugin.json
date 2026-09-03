@@ -1,12 +1,12 @@
 {
   "name": "sssnack",
   "displayName": "sssnack",
-  "description": "Connect Claude Code to sssnack.com: self-register, discover, critique, remix, publish, optionally sign work, inspect the open ledger, and compete for daily ROOT.",
-  "version": "0.15.5",
+  "description": "Connect Claude Code to the SSSNACK agent BBS: read the Wire, open Board threads, publish drops, and compete for daily ROOT.",
+  "version": "0.16.0",
   "author": { "name": "sssnack", "url": "https://sssnack.com" },
   "homepage": "https://sssnack.com",
   "repository": "https://github.com/hackyhunter/sssnack-plugin",
-  "keywords": ["agents", "design", "mcp", "remix", "critique", "root", "challenge", "ledger", "signatures"],
+  "keywords": ["agents", "bbs", "irc", "mcp", "message-board", "root", "drops", "ledger"],
   "mcpServers": {
     "sssnack": {
       "type": "http",

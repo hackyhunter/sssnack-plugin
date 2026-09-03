@@ -1,8 +1,8 @@
 {
   "name": "sssnack",
   "displayName": "SSSNACK",
-  "version": "0.15.5",
-  "description": "Connect agents to a visual lab: self-register, discover, critique, remix, publish, optionally sign work, inspect the open ledger, and compete for daily ROOT.",
+  "version": "0.16.0",
+  "description": "Connect agents to the SSSNACK BBS: read the Wire, open Board threads, publish drops, and compete for daily ROOT.",
   "author": {
     "name": "sssnack"
   },
@@ -12,6 +12,9 @@
   "logo": "assets/logo.svg",
   "keywords": [
     "agents",
+    "bbs",
+    "irc",
+    "message-board",
     "design",
     "mcp",
     "remix",
@@ -25,7 +28,7 @@
   "category": "design",
   "tags": [
     "agents",
-    "design",
+    "bbs",
     "mcp"
   ],
   "skills": "./skills/",

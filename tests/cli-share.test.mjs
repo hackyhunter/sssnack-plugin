@@ -313,3 +313,91 @@ test("optional signing failure never blocks an otherwise valid post", async (t) 
   assert.deepEqual(calls, ["start_agent_signing_key", "publish_snack"]);
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(agentToken));
 });
+
+test("Wire and Board commands map to the public and agent-scoped MCP tools", async (t) => {
+  const store = await mkdtemp(join(tmpdir(), "sssnack-cli-bbs-"));
+  t.after(() => rm(store, { recursive: true, force: true }));
+  const agentToken = `ssn_${"4".repeat(64)}`;
+  await writeFile(join(store, "agent-token"), `${agentToken}\n`);
+  const calls = [];
+  const server = createServer(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    const rpc = JSON.parse(body);
+    calls.push({
+      name: rpc.params?.name,
+      args: rpc.params?.arguments,
+      authorization: request.headers.authorization,
+    });
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(rpcSuccess(rpc.id, { ok: true }));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(
+    () => new Promise((resolve, reject) =>
+      server.close((error) => error ? reject(error) : resolve())
+    ),
+  );
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const env = {
+    SSSNACK_ENDPOINT: `http://127.0.0.1:${address.port}/api/mcp`,
+    SSSNACK_STORE: store,
+    SSSNACK_AGENT_TOKEN: "",
+  };
+  const id = "213764e3-5cd1-428c-9d8f-583fd6aaf9ae";
+  const commands = [
+    ["wire", "--channel", "ops", "--after", "123", "--after-id", id, "--limit", "7", "--json"],
+    ["say", "--channel", "ops", "--body", "control reached", "--reply-id", id, "--snack-id", id, "--key", "wire-v1", "--json"],
+    ["board", "--section", "root", "--sort", "top", "--limit", "9", "--json"],
+    ["thread", "--id", id, "--json"],
+    ["open-thread", "--section", "weird", "--subject", "Null route", "--body", "The empty response is the payload.", "--source-id", id, "--key", "thread-v1", "--json"],
+    ["reply-thread", "--id", id, "--body", ">>213764e3 reproduced", "--json"],
+  ];
+  for (const command of commands) {
+    const result = await runCli(command, env);
+    assert.equal(result.code, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), { ok: true });
+  }
+
+  assert.deepEqual(calls.map(({ name }) => name), [
+    "read_wire",
+    "send_wire_message",
+    "list_board_threads",
+    "get_board_thread",
+    "create_board_thread",
+    "reply_board_thread",
+  ]);
+  assert.deepEqual(calls[0].args, {
+    channel: "ops",
+    after: 123,
+    after_id: id,
+    limit: 7,
+  });
+  assert.deepEqual(calls[1].args, {
+    channel: "ops",
+    body: "control reached",
+    reply_to_id: id,
+    snack_id: id,
+    idempotency_key: "wire-v1",
+  });
+  assert.deepEqual(calls[2].args, { section: "root", sort: "top", limit: 9 });
+  assert.deepEqual(calls[3].args, { thread_id: id });
+  assert.deepEqual(calls[4].args, {
+    section: "weird",
+    subject: "Null route",
+    body: "The empty response is the payload.",
+    source_snack_id: id,
+    idempotency_key: "thread-v1",
+  });
+  assert.deepEqual(calls[5].args, {
+    thread_id: id,
+    body: ">>213764e3 reproduced",
+  });
+  assert.equal(calls[0].authorization, undefined);
+  assert.equal(calls[2].authorization, undefined);
+  assert.equal(calls[3].authorization, undefined);
+  for (const call of [calls[1], calls[4], calls[5]]) {
+    assert.equal(call.authorization, `Bearer ${agentToken}`);
+  }
+});
