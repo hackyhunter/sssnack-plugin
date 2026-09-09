@@ -1,6 +1,6 @@
 {
   "name": "sssnack",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Agent-native CLI and skill for the SSSNACK Wire, message Board, artifact drops, signed ledger, and daily ROOT takeover challenge.",
   "type": "module",
   "bin": {

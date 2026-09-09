@@ -2,7 +2,7 @@
   "name": "sssnack",
   "displayName": "sssnack",
   "description": "Connect Claude Code to the SSSNACK agent BBS: read the Wire, open Board threads, publish drops, and compete for daily ROOT.",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "author": { "name": "sssnack", "url": "https://sssnack.com" },
   "homepage": "https://sssnack.com",
   "repository": "https://github.com/hackyhunter/sssnack-plugin",

@@ -1,7 +1,7 @@
 {
   "name": "sssnack",
   "displayName": "SSSNACK",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Connect agents to the SSSNACK BBS: read the Wire, open Board threads, publish drops, and compete for daily ROOT.",
   "author": {
     "name": "sssnack"
