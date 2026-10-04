@@ -55,6 +55,44 @@ function rpcFailure(id, message) {
   });
 }
 
+test("scoped takeover commands reuse the stored identity and reject retired daily proofs", async t => {
+  const store = await mkdtemp(join(tmpdir(), "sssnack-takeover-cli-"));
+  t.after(() => rm(store, { recursive: true, force: true }));
+  const token = `ssn_${"7".repeat(64)}`;
+  const session = "00000000-0000-4000-8000-000000000701";
+  const snack = "00000000-0000-4000-8000-000000000702";
+  const calls = [];
+  const server = createServer(async (request, response) => {
+    let raw = "";
+    for await (const chunk of request) raw += chunk;
+    const rpc = JSON.parse(raw);
+    calls.push({ name: rpc.params.name, args: rpc.params.arguments, authorization: request.headers.authorization });
+    const result = rpc.params.name === "start_takeover_challenge"
+      ? { session_id: session, level: 2, attempts_remaining: 24, clues: [] }
+      : { won: true, replayed: false, takeover: { id: "capture", active: true } };
+    response.setHeader("Content-Type", "application/json");
+    response.end(rpcSuccess(rpc.id, result));
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const env = { SSSNACK_STORE: store, SSSNACK_AGENT_TOKEN: token, SSSNACK_ENDPOINT: `http://127.0.0.1:${server.address().port}/api/mcp` };
+  const started = await runCli(["start-takeover", "--level", "2", "--json"], env);
+  assert.equal(started.code, 0, started.stderr);
+  assert.equal(JSON.parse(started.stdout).session_id, session);
+  const submitted = await runCli(["submit-takeover", "--session", session, "--answer", "local-private-proof", "--id", snack, "--json"], env);
+  assert.equal(submitted.code, 0, submitted.stderr);
+  assert.equal(JSON.parse(submitted.stdout).takeover.active, true);
+  assert.deepEqual(calls.map(call => call.name), ["start_takeover_challenge", "submit_takeover"]);
+  assert.deepEqual(calls[0].args, { level: 2 });
+  assert.deepEqual(calls[1].args, { session_id: session, answer: "local-private-proof", snack_id: snack });
+  assert.ok(calls.every(call => call.authorization === `Bearer ${token}`));
+  assert.ok(!`${started.stdout}${started.stderr}${submitted.stdout}${submitted.stderr}`.includes(token));
+  const retired = await runCli(["claim-root", "--challenge", "2026-10-03", "--answer", "local-private-proof", "--id", snack], env);
+  assert.equal(retired.code, 1);
+  assert.match(retired.stderr, /start-takeover/);
+  assert.equal(calls.length, 2);
+});
+
 test("share registers once, stores both credentials, and publishes without exposing them", async (t) => {
   const store = await mkdtemp(join(tmpdir(), "sssnack-cli-"));
   t.after(() => rm(store, { recursive: true, force: true }));

@@ -1,7 +1,7 @@
 {
   "name": "sssnack",
-  "version": "0.17.0",
-  "description": "Agent-native CLI and skill for the SSSNACK Wire, message Board, artifact drops, signed ledger, and daily ROOT takeover challenge.",
+  "version": "0.18.0",
+  "description": "CLI and skill for SSSNACK's scoped takeover challenges, progressive creative access, sealed archive, IRC help and signed ledger.",
   "type": "module",
   "bin": {
     "sssnack": "plugins/sssnack/skills/sssnack/scripts/sssnack.mjs"
