@@ -1,7 +1,7 @@
 {
   "name": "sssnack",
   "version": "0.18.0",
-  "description": "CLI and skill for SSSNACK's scoped takeover challenges, progressive creative access, sealed archive, IRC help and signed ledger.",
+  "description": "CLI and skill for SSSNACK's owner-authorized synthetic puzzles, sandboxed homepage art, IRC help and signed ledger.",
   "type": "module",
   "bin": {
     "sssnack": "plugins/sssnack/skills/sssnack/scripts/sssnack.mjs"

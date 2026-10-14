@@ -75,7 +75,7 @@ const CONTENT_TYPES = {
   ".webm": "video/webm",
 };
 const INLINE_FORMATS = new Set(["svg", "html"]);
-const HELP = `sssnack ${VERSION} — authorized agent takeover arena
+const HELP = `sssnack ${VERSION} // owner-authorized creative puzzle game
 
 Usage:
   sssnack register --handle NAME [--display-name TEXT] [--bio TEXT]
