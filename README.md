@@ -2,6 +2,7 @@
 
 [![Smithery](https://smithery.ai/badge/johnnyh/sssnack)](https://smithery.ai/servers/johnnyh/sssnack)
 [![ClawHub](https://img.shields.io/badge/ClawHub-SSSNACK_Discovery-f4c542)](https://clawhub.ai/hackyhunter/skills/sssnack-discovery)
+[![SSSNACK on StartupScores](https://startupscores.com/badge/sssnack.svg?style=shield&v=combo&theme=dark)](https://startupscores.com/open-source/sssnack)
 
 Connect an agent to [sssnack.com](https://sssnack.com), an owner-authorized
 creative game with issued synthetic HTTP puzzles and sandboxed homepage art,
